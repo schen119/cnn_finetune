@@ -7,6 +7,7 @@ from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, AveragePooli
 from sklearn.metrics import log_loss
 
 from load_cifar10 import load_cifar10_data
+from keras.applications.vgg16 import preprocess_input
 
 def vgg16_model(img_rows, img_cols, channel=1, num_classes=None):
     """VGG 16 Model for Keras
@@ -23,18 +24,19 @@ def vgg16_model(img_rows, img_cols, channel=1, num_classes=None):
       num_classes - number of categories for our classification task
     """
     model = Sequential()
-    model.add(ZeroPadding2D((1, 1), input_shape=(channel, img_rows, img_cols)))
+    # 1
+    model.add(ZeroPadding2D((1, 1), input_shape=(img_rows, img_cols, channel)))
     model.add(Convolution2D(64, 3, 3, activation='relu'))
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(64, 3, 3, activation='relu'))
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
+    # 2
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(128, 3, 3, activation='relu'))
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(128, 3, 3, activation='relu'))
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
+    #3
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(256, 3, 3, activation='relu'))
     model.add(ZeroPadding2D((1, 1)))
@@ -42,7 +44,7 @@ def vgg16_model(img_rows, img_cols, channel=1, num_classes=None):
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(256, 3, 3, activation='relu'))
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
+    #4
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(512, 3, 3, activation='relu'))
     model.add(ZeroPadding2D((1, 1)))
@@ -50,7 +52,7 @@ def vgg16_model(img_rows, img_cols, channel=1, num_classes=None):
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(512, 3, 3, activation='relu'))
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
+    #5
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(512, 3, 3, activation='relu'))
     model.add(ZeroPadding2D((1, 1)))
@@ -68,7 +70,8 @@ def vgg16_model(img_rows, img_cols, channel=1, num_classes=None):
     model.add(Dense(1000, activation='softmax'))
 
     # Loads ImageNet pre-trained data
-    model.load_weights('imagenet_models/vgg16_weights.h5')
+    model.load_weights('my_models/vgg16_cifar_model.h5')
+    #model.load_weights('imagenet_models/vgg16_weights_tf_dim_ordering_tf_kernels.h5')
 
     # Truncate and replace softmax layer for transfer learning
     model.layers.pop()
@@ -95,10 +98,21 @@ if __name__ == '__main__':
     channel = 3
     num_classes = 10 
     batch_size = 16 
-    nb_epoch = 10
+    nb_epoch = 1
 
     # Load Cifar10 data. Please implement your own load_data() module for your own dataset
     X_train, Y_train, X_valid, Y_valid = load_cifar10_data(img_rows, img_cols)
+    # Switch RGB to BGR order 
+    X_train = X_train[..., ::-1] 
+    X_valid = X_valid[..., ::-1]  
+    # Subtract ImageNet mean pixel 
+    X_train[:, :, :, 0] -= 103.939
+    X_train[:, :, :, 1] -= 116.779
+    X_train[:, :, :, 2] -= 123.68
+    X_valid[:, :, :, 0] -= 103.939
+    X_valid[:, :, :, 1] -= 116.779
+    X_valid[:, :, :, 2] -= 123.68
+
 
     # Load our model
     model = vgg16_model(img_rows, img_cols, channel, num_classes)
@@ -106,9 +120,8 @@ if __name__ == '__main__':
     # Start Fine-tuning
     model.fit(X_train, Y_train,
               batch_size=batch_size,
-              nb_epoch=nb_epoch,
+              epochs=nb_epoch,
               shuffle=True,
-              verbose=1,
               validation_data=(X_valid, Y_valid),
               )
 
@@ -117,4 +130,6 @@ if __name__ == '__main__':
 
     # Cross-entropy loss score
     score = log_loss(Y_valid, predictions_valid)
+    model.save_weights('imagenet_models/vgg16_cifar_model2.h5')
+    K.clear_session()
 
